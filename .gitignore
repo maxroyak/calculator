@@ -1,2 +1,7 @@
 # Build artifacts
 build/
+
+# Internal project management files
+WORKLOG.md
+TASK.md
+QA_REPORT.md
