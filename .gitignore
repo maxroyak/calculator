@@ -5,3 +5,7 @@ build/
 WORKLOG.md
 TASK.md
 QA_REPORT.md
+worklog.md
+
+# Task folders (internal project management)
+tasks/
