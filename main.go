@@ -1,13 +1,16 @@
 // Calculator is a simple CLI tool that performs basic arithmetic operations:
-// add, subtract, multiply, and divide.
+// add, subtract, multiply, and divide. It also supports a web server mode
+// via the "serve" subcommand.
 package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"os"
 
 	"github.com/maxroyak/calculator/internal/calc"
+	"github.com/maxroyak/calculator/internal/server"
 )
 
 func main() {
@@ -26,6 +29,18 @@ func run(args []string) error {
 	if op == "-h" || op == "--help" {
 		return printUsage()
 	}
+
+	// Route to web server if the first argument is "serve".
+	if op == "serve" {
+		return runServe(args[1:])
+	}
+
+	return runCLI(args)
+}
+
+// runCLI processes the traditional CLI calculator commands.
+func runCLI(args []string) error {
+	op := args[0]
 
 	if len(args) < 3 {
 		return fmt.Errorf("operation %q requires two numeric operands", op)
@@ -48,6 +63,19 @@ func run(args []string) error {
 
 	fmt.Printf("%g\n", result)
 	return nil
+}
+
+// runServe starts the HTTP web server with optional port flag.
+func runServe(args []string) error {
+	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
+	port := fs.Int("port", 8080, "port to listen on")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	addr := fmt.Sprintf(":%d", *port)
+	srv := server.New(addr)
+	return srv.ListenAndServe()
 }
 
 func calculate(op string, a, b float64) (float64, error) {
@@ -79,6 +107,7 @@ func printUsage() error {
 
 Usage:
   calculator <operation> <operand1> <operand2>
+  calculator serve [--port 8080]
 
 Operations:
   add       Add two numbers
@@ -86,10 +115,15 @@ Operations:
   multiply  Multiply two numbers
   divide    Divide first number by second
 
+Web Server:
+  calculator serve              Start web server on port 8080
+  calculator serve --port 3000  Start web server on port 3000
+
 Examples:
   calculator add 5 3        # Output: 8
   calculator subtract 10 4  # Output: 6
   calculator multiply 6 7   # Output: 42
-  calculator divide 10 2    # Output: 5`)
+  calculator divide 10 2    # Output: 5
+  calculator serve          # Open http://localhost:8080`)
 	return errors.New("no operation provided")
 }

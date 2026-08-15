@@ -1,33 +1,33 @@
-# QA Report: Go CLI Calculator
+# QA Report: Web UI Additions (TASK-002)
 
 ## Metadata
-- **Report ID:** QA-001
+- **Report ID:** QA-002
 - **From:** qa_bot
 - **To:** pm_bot
 - **Project:** calculator
 - **Date:** 2026-08-15
-- **Review Duration:** ~0.2 hours
-- **Handover Reference:** WORKLOG 2026-08-15 23:49 (dev_bot TASK_COMPLETE)
+- **Review Duration:** 0.5 hours
+- **Task Reference:** TASK-002 (Web UI additions)
 - **Status:** APPROVED_WITH_COMMENTS
 
 ## Review Summary
-The Go CLI calculator is a well-structured, minimal project that follows the team's Go standards closely. All toolchain checks pass: `go fmt`, `go vet`, `go test -race`, and `go build` are clean. The `internal/calc` package achieves 100% test coverage with table-driven tests covering positive, negative, fractional, zero, and error cases. Division by zero correctly returns an error rather than panicking. No security vulnerabilities were identified. The only notable gap is the absence of unit tests for the `main` package (functions `run`, `calculate`, `parseFloat`, `printUsage`), which reports 0% coverage.
+The TASK-002 web UI additions are well-structured, follow Go conventions closely, and all toolchain checks pass (go fmt, go vet, go test -race, go build). The HTTP server correctly implements the JSON API with proper input validation, division-by-zero returns an error JSON (no crash), and CLI backward compatibility is fully preserved. Server package test coverage is 81.6% with table-driven tests covering positive, negative, and edge cases. Two important issues (missing main package tests, no request body size limit) and four minor issues are noted below.
 
 ### Overall Assessment
 | Aspect | Rating | Notes |
 |--------|--------|-------|
-| Code Quality | Excellent | Clean, idiomatic Go; proper error wrapping; early returns |
-| Test Coverage | Good | 100% on `internal/calc`; 0% on `main` package (no test files) |
-| Security | Excellent | Input validation present; no external deps; no injection surface |
-| Performance | Excellent | No concerns for a CLI calculator; no unnecessary allocations |
-| Documentation | Good | Godoc comments on all exported symbols; README thorough; missing DEV_HANDOVER.md |
+| Code Quality | Good | Clean, idiomatic Go. Godoc comments present. Proper error handling. Unused function `formatFloat` is dead code. |
+| Test Coverage | Good | internal/server 81.6%, internal/calc 100%. main package 0%. Tests are table-driven with positive + negative + edge cases. |
+| Security | Good | Input validation present. No injection surface (JSON API, static files only). Missing request body size limit (DoS vector). No CORS headers (acceptable for same-origin). |
+| Performance | Good | Embed.FS is efficient. No allocations concerns. http.FileServer for static serving is standard. |
+| Documentation | Good | README updated with web server section. Godoc on all exported types/functions. Package comments present. |
 
 ## Issues Found
 
 ### Critical Issues (MUST FIX - Blocks approval)
 | # | Issue | File | Line | Severity | Description | Recommendation |
 |---|-------|------|------|----------|-------------|----------------|
-| — | — | — | — | — | No critical issues found | — |
+| (none) | | | | | | |
 
 **Critical Issues Count:** 0
 **Status:** N/A
@@ -35,133 +35,167 @@ The Go CLI calculator is a well-structured, minimal project that follows the tea
 ### Important Issues (SHOULD FIX - Strongly recommended)
 | # | Issue | File | Line | Severity | Description | Recommendation |
 |---|-------|------|------|----------|-------------|----------------|
-| 1 | QA-IMP-001 | main.go | — | Important | No test file for the `main` package; `run`, `calculate`, `parseFloat`, and `printUsage` have 0% coverage. Standards require >80% on critical paths and `go test ./...` reports `?[no test files]` for the root package. | Add `main_test.go` with table-driven tests for `calculate` (all operations + unknown op), `parseFloat` (valid/invalid), `run` (no args, help, valid op, insufficient args, invalid operand), and `printUsage`. |
-| 2 | QA-IMP-002 | go.mod | 3 | Important | `go.mod` declares `go 1.25.0` but README states "Go 1.26 or later" and the toolchain in use is `go1.26.0`. The version mismatch is confusing and could cause CI failures on environments with only Go 1.25. | Align: either update `go.mod` to `go 1.26.0` to match the README, or update the README prerequisite to "Go 1.25 or later" to match `go.mod`. |
-| 3 | QA-IMP-003 | — | — | Important | No `DEV_HANDOVER.md` exists in the project directory. The HANDOVER_PROTOCOL.md (§3) requires dev_bot to create this document before QA review. | Request dev_bot to create `DEV_HANDOVER.md` per the template in HANDOVER_PROTOCOL.md §3.3. |
+| 1 | QA-002-I1 | internal/server/server.go | 87 | Important | No request body size limit on JSON decode. `json.NewDecoder(r.Body).Decode(&req)` reads an unbounded request body. A malicious client could send a very large body to exhaust server memory (DoS). | Wrap `r.Body` with `io.LimitReader(r.Body, maxBodySize)` before decoding, e.g. `r.Body = http.MaxBytesReader(w, r.Body, 1<<20)` (1 MB). Return 413 or 400 if exceeded. |
+| 2 | QA-002-I2 | main.go | 1 | Important | main package has 0% test coverage. Functions `run`, `runCLI`, `runServe`, `calculate`, `parseFloat`, `printUsage` are untested. This was flagged in QA-001 and remains unaddressed. The `runServe` function in particular has no test. | Add `main_test.go` with table-driven tests for `calculate`, `parseFloat`, and `run`/`runCLI` (the latter can be tested by calling `run` with arg slices and checking output/error). |
 
-**Important Issues Count:** 3
-**Status:** 3 remaining
+**Important Issues Count:** 2
+**Status:** 0 fixed, 2 remaining
 
 ### Minor Issues (NICE TO FIX - Non-blocking)
 | # | Issue | File | Line | Severity | Description | Recommendation |
 |---|-------|------|------|----------|-------------|----------------|
-| 1 | QA-MIN-001 | Makefile | 6-7 | Minor | `GO_FILES` and `PACKAGES` variables are defined but never used by any target. | Remove unused variables or use them in `lint`/`fmt` targets to be consistent with the template's intent. |
-| 2 | QA-MIN-002 | Makefile | 16 | Minor | Build target builds from root (`.`) rather than `./cmd/$(BINARY_NAME)` as in the template. This is intentional for this simple project (main.go at root, per template's "for simple apps" allowance) but deviates from the template's default. | Document this as a conscious decision in a comment, or consider moving `main.go` to `cmd/calculator/` for full template alignment. |
-| 3 | QA-MIN-003 | main.go | 77-95 | Minor | `printUsage` returns `errors.New("no operation provided")` — it both prints usage to stdout and returns an error. This dual behavior means calling `--help` prints usage but also exits with code 1 and an error message, which is unusual for `--help`/`-h` flags. | Consider returning `nil` for explicit `--help`/`-h` invocations (exit 0) and only returning the error for the no-args case. |
-| 4 | QA-MIN-004 | README.md | 29 | Minor | README states "Go 1.26 or later" but `go.mod` says `go 1.25.0`. See QA-IMP-002. | Fix in conjunction with QA-IMP-002. |
-| 5 | QA-MIN-005 | WORKLOG.md | 6 | Minor | The entry on line 6 is missing the opening `---` separator: the line reads `---2026-08-15 23:46` (merged with the previous entry's closing `---`). | Add a newline and `---` separator to properly delimit the entry per the WORKLOG format. |
+| 1 | QA-002-M1 | internal/server/server.go | 121-123 | Minor | `formatFloat` function is defined but never called anywhere in the codebase (dead code). It is tested but serves no runtime purpose. | Either use it in the response (e.g., return a formatted string alongside the numeric result) or remove it and its test. |
+| 2 | QA-002-M2 | internal/server/server_test.go | 170-179 | Minor | `TestNewServerRoutes` does not actually test `server.New()`. It constructs a custom `httptest.Server` with inline handler logic that duplicates the mux wiring, so `New()` and its `ListenAndServe()` are never exercised. | Consider testing `New()` by extracting the `http.Handler` (mux) from the Server struct (e.g., via a `Handler()` accessor) and passing it to `httptest.NewServer`. |
+| 3 | QA-002-M3 | web/app.js | 46 | Minor | `addHistory` uses `li.innerHTML` to construct history entries. While the inputs are user-typed numbers (not strings from the user), using `innerHTML` with string concatenation is an XSS-prone pattern. The `result` value comes from the server JSON response and `a`/`b` from input fields — these are numeric, so exploitation is unlikely, but the pattern is unsafe by default. | Use `textContent` for the entry text and `createElement`/`appendChild` for the result span, or sanitize values before inserting via `innerHTML`. |
+| 4 | QA-002-M4 | internal/server/server.go | 95-96 | Minor | Compute errors (e.g., unknown operation, division by zero) all return HTTP 400 Bad Request. While this is defensible, a case could be made for returning 422 Unprocessable Entity for unknown operations (the request is well-formed JSON but semantically invalid). This is a style preference, not a bug. | Consider differentiating 400 (malformed request) from 422 (semantically invalid) if the API evolves. Low priority. |
 
-**Minor Issues Count:** 5
+**Minor Issues Count:** 4
 
 ## Security Findings
 
 ### Vulnerabilities
 | # | Vulnerability | CVSS | Description | Mitigation |
 |---|---------------|------|-------------|------------|
-| — | — | — | No vulnerabilities identified | — |
+| 1 | Unbounded Request Body | 3.7 (Low) | `handleCalculate` reads request body without a size limit. A client can send arbitrarily large JSON to consume server memory. | Use `http.MaxBytesReader` or `io.LimitReader` to cap body size (e.g., 1 MB). |
 
 ### Security Concerns
-- **Input validation:** All numeric inputs are validated via `parseFloat` with clear error messages on failure. ✓
-- **Division by zero:** Returns a descriptive error, no panic. ✓
-- **Unknown operation:** Returns a descriptive error listing valid operations. ✓
-- **No external dependencies:** The project uses only the Go standard library, eliminating supply-chain risk. ✓
-- **No injection surface:** No eval, no shell execution, no file I/O, no network calls. ✓
-- **Error messages:** Do not leak sensitive internal state. ✓
-- **golangci-lint / gosec / govulncheck:** Not available in the environment. Recommend running these in CI when the tools are installed. The Makefile includes a `lint` target referencing `golangci-lint`.
+- **No CORS headers:** The API does not set CORS headers. This is acceptable since the web UI is same-origin (served from the same server). If the API is intended for cross-origin use, CORS would need to be configured.
+- **No rate limiting:** The server has no rate limiting. For a local calculator tool this is acceptable; for production deployment it would be needed.
+- **No TLS:** The server is plain HTTP. Acceptable for local development; document that a reverse proxy should handle TLS for any non-local deployment.
+- **Static file serving:** `http.FileServer` with `http.FS(web.FS)` serves embedded files only — no path traversal risk since `embed.FS` does not allow escaping the embedded directory.
+- **Input validation:** JSON request is properly decoded into a typed struct. Operation is validated via switch/default. Numbers are `float64` (Go handles invalid JSON decode with error). No SQL, shell, or template injection surface.
+- **XSS in frontend:** `innerHTML` usage in `app.js:46` is a minor concern (see QA-002-M3). Values are numeric so exploitation requires a modified server response.
 
 ## Test Quality Assessment
 
 ### Coverage Analysis
-- **Current coverage:** `internal/calc` = 100%; `main` package = 0% (no test files)
+- **Current coverage:** internal/server 81.6%, internal/calc 100.0%, main 0.0%, web N/A
 - **Target coverage:** >80% on critical paths (per GOLANG_STANDARDS.md)
-- **Gap:** The `main` package's CLI logic (`run`, `calculate`, `parseFloat`, `printUsage`) is untested. While the `internal/calc` library is fully covered, the argument parsing and operation dispatch logic in `main.go` — which is user-facing — has no automated tests.
+- **Gap:** main package at 0% (important), `New()` and `ListenAndServe()` at 0% in server package
 
 ### Test Quality
 | Aspect | Rating | Notes |
 |--------|--------|-------|
-| Test independence | Good | Each test case is self-contained; no shared mutable state |
-| Edge case coverage | Good | Covers positive, negative, mixed signs, zero, fractional, division-by-zero error |
-| Test maintainability | Good | Table-driven with named subtests; clear error messages |
+| Test independence | Good | Tests use httptest.NewRecorder and httptest.NewRequest — no shared state, no external dependencies. |
+| Edge case coverage | Good | Division by zero, invalid JSON, empty body, wrong HTTP method, unknown operation all covered. |
+| Test maintainability | Good | Table-driven tests with clear names. `ptr()` helper for float64 pointers. Subtests via `t.Run`. |
 
 ### Missing Tests
 | Test | File | Priority | Reason Missing |
 |------|------|----------|----------------|
-| TestCalculate | main_test.go | High | No test file for `main` package; `calculate` dispatch is critical user-facing logic |
-| TestParseFloat | main_test.go | High | Input validation for numeric parsing; no test file exists |
-| TestRun | main_test.go | Medium | Integration of argument parsing + operation dispatch; no test file exists |
-| TestPrintUsage | main_test.go | Low | Usage output; no test file exists |
+| `server.New()` route wiring | server_test.go | Medium | `TestNewServerRoutes` tests a hand-built mux, not the actual `New()` function |
+| `server.ListenAndServe()` | server_test.go | Low | Hard to test without port binding; acceptable to skip |
+| main package functions | main_test.go | High | No test file exists for main package (flagged in QA-001) |
+| Request body size limit | server_test.go | Medium | No limit exists to test (see QA-002-I1) |
+| Very large number handling | server_test.go | Low | No test for float64 overflow/inf/NaN edge cases |
 
 ## Performance Findings
 
 ### Observations
-No performance concerns. The calculator is a single-shot CLI with no loops, no goroutines, no I/O beyond stdin/stdout. All operations are O(1) arithmetic.
+- `embed.FS` is zero-copy at runtime — static assets are embedded in the binary, no disk I/O.
+- `http.FileServer` is the standard Go approach for static serving with proper caching headers.
+- JSON encoding/decoding uses `json.NewEncoder`/`json.NewDecoder` (streaming) — efficient for small payloads.
+- No goroutines, no mutexes — the server is purely request-scoped, no race conditions possible.
 
 ### Recommendations
-None.
+- No performance optimizations needed for this use case.
 
 ## Code Review Comments
 
 ### General Comments
-The code is clean, idiomatic Go that follows Effective Go conventions. Error handling follows the standards: errors are checked explicitly, wrapped with context using `fmt.Errorf` with `%w`, and returned early. The `internal/calc` package is well-documented with godoc comments on the package and all exported functions. The `main` package has a package-level godoc comment. Import grouping is correct (stdlib, then local). Line lengths are well within 120 characters.
+- Code is clean, idiomatic, and well-organized. Package structure follows the project template.
+- Error handling is consistent: errors are checked, wrapped with context where needed, and returned to the caller.
+- Import grouping is correct: standard library first, then local packages.
+- Godoc comments are present on all exported symbols (`Server`, `New`, `ListenAndServe`) and on both packages (`server`, `web`).
+- The `compute` function in `server.go` duplicates the `calculate` function in `main.go`. Both are switch statements over the same operations. This is a minor DRY violation but acceptable given the different return types and package boundaries.
 
 ### Specific Comments
 | # | File | Line | Comment |
 |---|------|------|---------|
-| 1 | main.go | 1-2 | Package comment is good — describes purpose and operations. |
-| 2 | main.go | 36 | Good error wrapping with `%w` for operand parse errors. |
-| 3 | main.go | 46 | `calculate` error is returned without wrapping context. Consider `fmt.Errorf("calculate: %w", err)` for consistency, though the underlying errors are already descriptive. |
-| 4 | calc.go | 1-5 | Excellent package-level godoc documenting the division-by-zero contract. |
-| 5 | calc.go | 26-29 | `Divide` correctly returns error on zero divisor — no panic. Clean implementation. |
-| 6 | calc_test.go | 1 | No package comment. Since this is an internal test file (`package calc`), this is acceptable but a brief comment would be consistent with the standards. |
+| 1 | server.go | 62-63 | `staticHandler()` returns a new `http.FileServer` on every call. In `New()` it's called once, so this is fine. But `TestNewServerRoutes` calls it per-request in the test harness. Minor inefficiency in tests only. |
+| 2 | server.go | 87 | `json.NewDecoder(r.Body)` does not limit body size. See QA-002-I1. |
+| 3 | server.go | 121-123 | `formatFloat` is dead code. See QA-002-M1. |
+| 4 | app.js | 87 | `Number(data.result).toString()` is used to format the result client-side. The server already returns a float64; `JSON.parse` handles it. The `Number()` call is redundant but harmless. |
+| 5 | main.go | 69-79 | `runServe` does not handle the case where `server.New(addr)` returns nil (it can't with current code, but the pattern is fragile). Consider adding a nil check or making `New` return an error. |
+| 6 | main.go | 34-36 | `op == "serve"` is checked with string equality. This is fine for a simple CLI. If the CLI grows, consider using a subcommand framework (e.g., `flag.NewFlagSet` per subcommand). |
 
 ## Recommendations
 
 ### Required Actions
-(None — no critical issues block approval.)
+(No required actions — no critical issues found.)
 
 ### Suggested Improvements
-1. **Add `main_test.go`** (QA-IMP-001): Create table-driven tests for `calculate`, `parseFloat`, and `run` to bring the `main` package to >80% coverage. This is the most impactful improvement.
-2. **Fix go.mod / README version mismatch** (QA-IMP-002): Align the Go version in both files.
-3. **Create DEV_HANDOVER.md** (QA-IMP-003): Per the handover protocol, dev_bot should provide this before QA review.
-4. **Improve `--help` behavior** (QA-MIN-003): Return `nil` for explicit help flags so exit code is 0.
-5. **Fix WORKLOG.md formatting** (QA-MIN-005): Add missing `---` separator on line 6.
-6. **Remove unused Makefile variables** (QA-MIN-001): Clean up `GO_FILES` and `PACKAGES` if not used.
-7. **Install and run security tools in CI**: `golangci-lint`, `gosec`, and `govulncheck` are not available in the current environment. The Makefile has a `lint` target; recommend adding `gosec` and `govulncheck` targets and running them in CI.
+1. Add `http.MaxBytesReader` to `handleCalculate` to limit request body size (QA-002-I1).
+2. Add `main_test.go` with tests for `calculate`, `parseFloat`, and `run`/`runCLI` (QA-002-I2).
+3. Remove or use the dead `formatFloat` function (QA-002-M1).
+4. Fix `TestNewServerRoutes` to actually test `server.New()` (QA-002-M2).
+5. Replace `innerHTML` with `textContent`/`createElement` in `app.js` (QA-002-M3).
 
 ### Best Practices Not Followed
 | Practice | Location | Recommendation |
 |----------|----------|----------------|
-| >80% coverage on critical paths | main.go (entire file) | Add tests for `run`, `calculate`, `parseFloat` |
-| DEV_HANDOVER.md before QA | project root | dev_bot should create handover document |
-| WORKLOG.md entry format | WORKLOG.md:6 | Fix missing `---` delimiter |
+| Request body size limiting | server.go:87 | Use `http.MaxBytesReader` before decoding JSON |
+| Dead code removal | server.go:121-123 | Remove unused `formatFloat` or integrate it |
+| DRY (calculator logic) | main.go:81 / server.go:105 | Consider a shared `calc.Operate(op, a, b)` function to eliminate the duplicated switch |
 
 ## Approval Status
 
 ### Decision
 **Status:** APPROVED_WITH_COMMENTS
 
-The project is functionally correct, secure, and well-structured. All toolchain checks pass. The `internal/calc` package has excellent test coverage. The main gaps are: (1) no tests for the `main` package's CLI logic, (2) a go.mod/README version mismatch, and (3) a missing DEV_HANDOVER.md. None of these are blocking — the calculator works correctly and safely — but they should be addressed for full standards compliance.
-
 ### Conditions
-1. Add `main_test.go` with tests for `calculate`, `parseFloat`, and `run` to achieve >80% coverage on the `main` package (target: before next release).
-2. Align Go version between `go.mod` and `README.md`.
-3. Create `DEV_HANDOVER.md` per HANDOVER_PROTOCOL.md §3.3.
+1. Address QA-002-I1 (request body size limit) before any non-local deployment.
+2. Address QA-002-I2 (main package tests) in a future iteration — carries over from QA-001.
 
 ### Next Steps
-- [ ] dev_bot addresses QA-IMP-001 (add main package tests)
-- [ ] dev_bot addresses QA-IMP-002 (fix go version mismatch)
-- [ ] dev_bot addresses QA-IMP-003 (create DEV_HANDOVER.md)
-- [ ] qa_bot re-reviews after fixes (if needed)
-- [ ] Minor issues can be addressed opportunistically
+- [ ] dev_bot to address QA-002-I1 (add MaxBytesReader) — recommended before next release
+- [ ] dev_bot to address QA-002-I2 (add main_test.go) — carried over from QA-001
+- [ ] pm_bot to decide on minor issues (M1–M4) — defer or schedule
+- [ ] Consider extracting shared `calc.Operate()` to eliminate duplicate switch in main.go and server.go
+
+## Toolchain Verification Results
+
+| Check | Command | Result |
+|-------|---------|--------|
+| Format | `go fmt ./...` | PASS (exit 0, no changes) |
+| Vet | `go vet ./...` | PASS (exit 0, clean) |
+| Test (race) | `go test -race ./...` | PASS (calc 1.011s, server 1.025s) |
+| Build | `go build -o build/calculator .` | PASS (exit 0) |
+| Coverage | `go test -cover ./...` | calc 100%, server 81.6%, main 0% |
+
+## Runtime Verification Results
+
+| Test | Result |
+|------|--------|
+| CLI: add 5 3 | ✅ Output: 8, exit 0 |
+| CLI: subtract 10 4 | ✅ Output: 6, exit 0 |
+| CLI: multiply 6 7 | ✅ Output: 42, exit 0 |
+| CLI: divide 10 2 | ✅ Output: 5, exit 0 |
+| CLI: divide 10 0 | ✅ Error: "division by zero is not allowed", exit 1 |
+| CLI: foo 1 2 | ✅ Error: "unknown operation", exit 1 |
+| CLI: no args | ✅ Usage printed, exit 1 |
+| API: POST /api/calculate add | ✅ `{"result":8}` |
+| API: POST /api/calculate divide by zero | ✅ `{"error":"division by zero is not allowed"}` |
+| API: POST /api/calculate unknown op | ✅ `{"error":"unknown operation ..."}` |
+| API: POST /api/calculate invalid JSON | ✅ `{"error":"invalid JSON body"}` |
+| API: POST /api/calculate empty body | ✅ `{"error":"invalid JSON body"}` |
+| API: POST /api/calculate missing fields | ✅ `{"result":0}` (zero-value for missing a/b) |
+| API: GET /api/calculate (wrong method) | ✅ HTTP 405 |
+| API: GET /api/health | ✅ `{"status":"ok"}` |
+| API: POST /api/health (wrong method) | ✅ HTTP 405 |
+| Static: GET / | ✅ HTTP 200 (index.html) |
+| Static: GET /style.css | ✅ HTTP 200 |
+| Static: GET /app.js | ✅ HTTP 200 |
+| Static: GET /nonexistent | ✅ HTTP 404 |
 
 ## Time Spent
 | Activity | Time |
 |----------|------|
-| Code review | 0.1 hours |
-| Security review | 0.05 hours |
-| Testing (running toolchain checks) | 0.02 hours |
-| Documentation (writing QA_REPORT.md) | 0.05 hours |
-| **Total** | **~0.2 hours** |
+| Code review | 0.2 hours |
+| Security review | 0.1 hours |
+| Testing (toolchain + runtime) | 0.1 hours |
+| Documentation | 0.1 hours |
+| **Total** | 0.5 hours |
 
 ## Sign-Off
 
@@ -169,52 +203,4 @@ The project is functionally correct, secure, and well-structured. All toolchain 
 **Date:** 2026-08-15
 **Decision:** APPROVED_WITH_COMMENTS
 
-**WORKLOG:** Reviewer confirms WORKLOG.md entries created for review start and completion.
-
----
-
-## Verification Results Summary
-
-| Check | Command | Result |
-|-------|---------|--------|
-| Format | `go fmt ./...` | ✅ Clean (no files needed formatting) |
-| Vet | `go vet ./...` | ✅ Clean (exit 0) |
-| Test (race) | `go test -race ./...` | ✅ All pass (21 subtests across 4 test functions) |
-| Coverage | `go test -cover ./...` | `internal/calc`: 100% · `main`: 0% (no test files) |
-| Build | `go build -o /dev/null .` | ✅ Success (exit 0) |
-| Binary — add | `calculator add 5 3` | ✅ Output: `8` |
-| Binary — subtract | `calculator subtract 10 4` | ✅ Output: `6` |
-| Binary — multiply | `calculator multiply 6 7` | ✅ Output: `42` |
-| Binary — divide | `calculator divide 10 2` | ✅ Output: `5` |
-| Binary — div by zero | `calculator divide 10 0` | ✅ Error: `division by zero is not allowed` (exit 1) |
-| Binary — unknown op | `calculator foo 1 2` | ✅ Error: `unknown operation "foo"...` (exit 1) |
-| Binary — invalid operand | `calculator add abc 3` | ✅ Error: `first operand: invalid number "abc"` (exit 1) |
-| Binary — insufficient args | `calculator add 5` | ✅ Error: `operation "add" requires two numeric operands` (exit 1) |
-| Binary — no args / help | `calculator` / `calculator --help` | ✅ Prints usage (exit 1) |
-| golangci-lint | N/A | ⚠️ Tool not installed in environment |
-| gosec | N/A | ⚠️ Tool not installed in environment |
-| govulncheck | N/A | ⚠️ Tool not installed in environment |
-
-## Standards Compliance Checklist
-
-| Standard (from GOLANG_STANDARDS.md) | Status | Notes |
-|--------------------------------------|--------|-------|
-| Follow Effective Go | ✅ | Idiomatic Go throughout |
-| Use gofmt | ✅ | `go fmt ./...` clean |
-| Group imports (stdlib, third-party, local) | ✅ | stdlib block, then local import |
-| Lines < 120 chars | ✅ | All lines within limit |
-| MixedCaps for exported names | ✅ | `Add`, `Subtract`, `Multiply`, `Divide` |
-| camelCase for unexported names | ✅ | `run`, `calculate`, `parseFloat`, `printUsage` |
-| Check all errors explicitly | ✅ | All errors checked |
-| Return early on errors | ✅ | Early returns throughout `run` |
-| Wrap errors with context | ✅ | `fmt.Errorf` with `%w` |
-| Don't ignore errors with `_` | ✅ | No ignored errors |
-| Meaningful error messages | ✅ | Descriptive messages |
-| Table-driven tests | ✅ | All 4 test functions are table-driven |
-| Test positive + negative cases | ✅ | Both covered |
-| >80% coverage on critical paths | ⚠️ | 100% on `calc`, 0% on `main` package |
-| Validate all inputs | ✅ | `parseFloat` validates numeric input |
-| Godoc comments on exported symbols | ✅ | All exported functions documented |
-| README with setup and usage | ✅ | Comprehensive README |
-| WORKLOG.md maintained | ✅ | Entries present (minor formatting issue) |
-| Makefile present | ✅ | Follows MAKEFILE_TEMPLATE with appropriate adjustments |
+**WORKLOG:** Reviewer confirms WORKLOG.md entry created with findings summary.

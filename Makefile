@@ -1,4 +1,4 @@
-.PHONY: all build test lint fmt vet race clean help
+.PHONY: all build test lint fmt vet race clean serve help
 
 # Variables
 BINARY_NAME ?= calculator
@@ -55,8 +55,18 @@ help:
 	@echo "  make lint    - Run linter"
 	@echo "  make fmt     - Format code"
 	@echo "  make vet     - Vet code"
+	@echo "  make serve   - Build and start web server on :8080"
 	@echo "  make clean   - Clean build artifacts"
 	@echo "  make help    - Show this help"
+
+# Start the web server (default port 8080)
+serve: build
+	@echo "Starting web server on port 8080..."
+	@./$(BUILD_DIR)/$(BINARY_NAME) serve
+
+# Start the web server on a custom port
+serve-port: build
+	@read -p "Port: " port; ./$(BUILD_DIR)/$(BINARY_NAME) serve --port $$port
 
 # Development workflow
 dev: fmt vet test

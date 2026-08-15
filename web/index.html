@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculator</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="calculator">
+        <h1>Calculator</h1>
+        <form id="calc-form" autocomplete="off">
+            <div class="field">
+                <label for="a">First number</label>
+                <input type="number" id="a" name="a" step="any" required>
+            </div>
+            <div class="field">
+                <label for="operation">Operation</label>
+                <select id="operation" name="operation">
+                    <option value="add">Add (+)</option>
+                    <option value="subtract">Subtract (−)</option>
+                    <option value="multiply">Multiply (×)</option>
+                    <option value="divide">Divide (÷)</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="b">Second number</label>
+                <input type="number" id="b" name="b" step="any" required>
+            </div>
+            <button type="submit" id="calc-btn">Calculate</button>
+        </form>
+        <div id="result-box" class="result-box hidden">
+            <span class="result-label">Result</span>
+            <span id="result" class="result-value"></span>
+        </div>
+        <div id="error-box" class="error-box hidden">
+            <span id="error-text"></span>
+        </div>
+        <div id="history-section" class="history-section hidden">
+            <h2>Recent Calculations</h2>
+            <ul id="history-list"></ul>
+        </div>
+    </div>
+    <script src="/app.js"></script>
+</body>
+</html>
