@@ -1,13 +1,18 @@
 :root {
     --bg: #0f172a;
-    --card: #1e293b;
-    --accent: #3b82f6;
-    --accent-hover: #2563eb;
+    --calculator-bg: #1e293b;
+    --display-bg: #0c1322;
+    --digit-bg: #334155;
+    --digit-active: #475569;
+    --op-bg: #f59e0b;
+    --op-active: #d97706;
+    --equals-bg: #3b82f6;
+    --equals-active: #2563eb;
+    --clear-bg: #ef4444;
+    --clear-active: #dc2626;
     --text: #f1f5f9;
-    --text-muted: #94a3b8;
+    --text-dim: #94a3b8;
     --error: #ef4444;
-    --success: #22c55e;
-    --border: #334155;
 }
 
 * {
@@ -22,158 +27,144 @@ body {
     color: var(--text);
     display: flex;
     justify-content: center;
-    align-items: flex-start;
+    align-items: center;
     min-height: 100vh;
-    padding: 2rem 1rem;
+    padding: 1rem;
 }
 
 .calculator {
-    background: var(--card);
-    border-radius: 16px;
-    padding: 2rem;
+    background: var(--calculator-bg);
+    border-radius: 20px;
+    padding: 1.25rem;
     width: 100%;
-    max-width: 420px;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+    max-width: 340px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
-h1 {
-    text-align: center;
-    font-size: 1.75rem;
-    margin-bottom: 1.5rem;
-}
-
-.field {
-    margin-bottom: 1.25rem;
-}
-
-label {
-    display: block;
-    font-size: 0.875rem;
-    color: var(--text-muted);
-    margin-bottom: 0.375rem;
-}
-
-input,
-select {
-    width: 100%;
-    padding: 0.625rem 0.75rem;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
+/* ---- Display ---- */
+.display {
+    background: var(--display-bg);
     color: var(--text);
-    font-size: 1rem;
-    transition: border-color 0.15s;
+    font-family: "SF Mono", "Fira Code", "Courier New", monospace;
+    font-size: 2.5rem;
+    font-weight: 700;
+    text-align: right;
+    padding: 1.25rem 1rem;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+    min-height: 4.5rem;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-input:focus,
-select:focus {
-    outline: none;
-    border-color: var(--accent);
+.display.error {
+    color: var(--error);
 }
 
-button {
-    width: 100%;
-    padding: 0.75rem;
-    background: var(--accent);
-    color: white;
+/* ---- Button grid ---- */
+.button-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: 60px;
+    gap: 8px;
+}
+
+/* ---- Base button ---- */
+.btn {
     border: none;
-    border-radius: 8px;
-    font-size: 1rem;
+    border-radius: 12px;
+    font-size: 1.4rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.15s;
-}
-
-button:hover {
-    background: var(--accent-hover);
-}
-
-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.result-box {
-    margin-top: 1.25rem;
-    padding: 1rem;
-    background: rgba(34, 197, 94, 0.1);
-    border: 1px solid var(--success);
-    border-radius: 8px;
-    text-align: center;
-}
-
-.result-label {
-    display: block;
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.result-value {
-    display: block;
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--success);
-    margin-top: 0.25rem;
-}
-
-.error-box {
-    margin-top: 1.25rem;
-    padding: 0.875rem 1rem;
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid var(--error);
-    border-radius: 8px;
-    color: var(--error);
-    font-size: 0.9rem;
-    text-align: center;
-}
-
-.hidden {
-    display: none;
-}
-
-.history-section {
-    margin-top: 1.5rem;
-    border-top: 1px solid var(--border);
-    padding-top: 1rem;
-}
-
-.history-section h2 {
-    font-size: 1rem;
-    color: var(--text-muted);
-    margin-bottom: 0.75rem;
-}
-
-#history-list {
-    list-style: none;
-    max-height: 200px;
-    overflow-y: auto;
-}
-
-#history-list li {
-    padding: 0.5rem 0.75rem;
-    background: var(--bg);
-    border-radius: 6px;
-    margin-bottom: 0.375rem;
-    font-size: 0.875rem;
-    color: var(--text-muted);
-}
-
-#history-list li .hist-result {
+    transition: filter 0.1s, transform 0.05s;
     color: var(--text);
-    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
-@media (max-width: 480px) {
-    body {
-        padding: 1rem 0.5rem;
-    }
+.btn:hover {
+    filter: brightness(1.1);
+}
+
+.btn:active,
+.btn.pressed {
+    filter: brightness(0.85);
+    transform: scale(0.95);
+}
+
+/* ---- Digit buttons ---- */
+.btn-digit {
+    background: var(--digit-bg);
+}
+
+.btn-digit:active,
+.btn-digit.pressed {
+    background: var(--digit-active);
+}
+
+/* ---- Operation buttons ---- */
+.btn-op {
+    background: var(--op-bg);
+    color: #1a1208;
+}
+
+.btn-op:active,
+.btn-op.pressed {
+    background: var(--op-active);
+}
+
+/* ---- Plus button spans 2 rows ---- */
+.btn-plus {
+    grid-row: span 2;
+}
+
+/* ---- Equals button spans 2 rows ---- */
+.btn-equals {
+    background: var(--equals-bg);
+    grid-row: span 2;
+}
+
+.btn-equals:active,
+.btn-equals.pressed {
+    background: var(--equals-active);
+}
+
+/* ---- Clear button ---- */
+.btn-clear {
+    background: var(--clear-bg);
+}
+
+.btn-clear:active,
+.btn-clear.pressed {
+    background: var(--clear-active);
+}
+
+/* ---- Zero button spans 2 columns ---- */
+.btn-zero {
+    grid-column: span 2;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 380px) {
     .calculator {
-        padding: 1.25rem;
-        border-radius: 12px;
+        padding: 1rem;
+        max-width: 100%;
     }
-    h1 {
-        font-size: 1.5rem;
+    .display {
+        font-size: 2rem;
+        padding: 1rem 0.75rem;
+    }
+    .btn {
+        font-size: 1.2rem;
+    }
+    .button-grid {
+        grid-auto-rows: 52px;
+        gap: 6px;
     }
 }
